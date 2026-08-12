@@ -53,6 +53,7 @@
     </div>
 
     <div class="chartwrap">
+      <div id="bootMsg" class="boot-msg">Starting FX Vision…</div>
       <canvas id="chart" aria-label="Price chart with results"></canvas>
       <div id="loading" hidden><div class="spin" role="status" aria-label="Loading"></div></div>
     </div>
@@ -96,7 +97,7 @@
   <input id="scanFile" type="file" accept="image/*" hidden />
   <input id="scanCamera" type="file" accept="image/*" capture="environment" hidden />
 
-  <div id="cameraScan" class="camera-scan" hidden>
+  <div id="cameraScan" class="camera-scan">
     <video id="cameraVideo" playsinline muted autoplay></video>
     <div class="camera-mask" aria-hidden="true">
       <div class="camera-box" id="cameraBox"></div>
@@ -107,6 +108,6 @@
   </div>
 
   <div id="toast" role="status"></div>
-  <script type="module" src="js/app.js?v=5"></script>
+  <script type="module" src="js/app.js?v=7"></script>
 </body>
 </html>

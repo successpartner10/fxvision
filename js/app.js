@@ -6,10 +6,10 @@ import {
   fetchTickers,
   curatedPairs,
   demoCandles,
-} from "./data.js";
-import { analyze, formatPrice } from "./analyze.js";
-import { buildMessages, copyText } from "./messages.js";
-import { Chart } from "./chart.js";
+} from "./data.js?v=7";
+import { analyze, formatPrice } from "./analyze.js?v=7";
+import { buildMessages, copyText } from "./messages.js?v=7";
+import { Chart } from "./chart.js?v=7";
 import {
   captureOtherScreen,
   loadImageFile,
@@ -19,7 +19,7 @@ import {
   grabCameraFrame,
   stopStream,
   countCandlesQuick,
-} from "./scan.js";
+} from "./scan.js?v=7";
 
 const state = {
   symbol: localStorage.getItem("twoline.symbol") || "BTCUSDT",
@@ -70,13 +70,19 @@ const els = {
 let cameraStream = null;
 let previewTimer = null;
 
-const chart = new Chart(document.getElementById("chart"));
+let chart;
+try {
+  chart = new Chart(document.getElementById("chart"));
+} catch (err) {
+  console.error(err);
+}
 
 function tfLabel(id) {
   return TIMEFRAMES.find((t) => t.id === id)?.label || id.toUpperCase();
 }
 
 function toast(msg) {
+  if (!els.toast) return;
   els.toast.textContent = msg;
   els.toast.classList.add("show");
   clearTimeout(toast._t);
@@ -85,7 +91,12 @@ function toast(msg) {
 
 function setLoading(on) {
   state.loading = on;
-  els.loading.hidden = !on;
+  if (els.loading) els.loading.hidden = !on;
+}
+
+function hideBoot() {
+  const boot = document.getElementById("bootMsg");
+  if (boot) boot.remove();
 }
 
 function renderTfs() {
@@ -260,12 +271,12 @@ function apply(candles) {
     hour: "2-digit",
     minute: "2-digit",
   });
-  chart.setMeta({
+  chart?.setMeta({
     symbol: displaySymbol(state.symbol),
     tf: tfLabel(state.tf),
     asOf: `${asOf}${state.demo ? " · demo" : ""}`,
   });
-  chart.setData(candles, state.analysis, state.messages);
+  chart?.setData(candles, state.analysis, state.messages);
   renderPrice();
   renderStatus();
 }
@@ -390,7 +401,7 @@ async function openPhoneCamera() {
   }
   try {
     cameraStream = await startPhoneCamera(els.cameraVideo);
-    els.cameraScan.hidden = false;
+    els.cameraScan?.classList.add("is-on");
     startCameraPreview();
   } catch (err) {
     if (err.name === "NotAllowedError") toast("Camera permission denied");
@@ -433,7 +444,7 @@ function closePhoneCamera() {
   stopStream(cameraStream);
   cameraStream = null;
   if (els.cameraVideo) els.cameraVideo.srcObject = null;
-  if (els.cameraScan) els.cameraScan.hidden = true;
+  els.cameraScan?.classList.remove("is-on");
 }
 
 async function shutterScan() {
@@ -471,7 +482,7 @@ els.scanUploadBtn?.addEventListener("click", () => els.scanFile?.click());
 els.scanPhotoBtn?.addEventListener("click", openPhoneCamera);
 els.cameraClose?.addEventListener("click", closePhoneCamera);
 els.cameraShutter?.addEventListener("click", shutterScan);
-els.scanFile.addEventListener("change", async () => {
+els.scanFile?.addEventListener("change", async () => {
   const file = els.scanFile.files?.[0];
   els.scanFile.value = "";
   if (!file) return;
@@ -481,7 +492,7 @@ els.scanFile.addEventListener("change", async () => {
     toast(err.message || "Could not read image");
   }
 });
-els.scanCamera.addEventListener("change", async () => {
+els.scanCamera?.addEventListener("change", async () => {
   const file = els.scanCamera.files?.[0];
   els.scanCamera.value = "";
   if (!file) return;
@@ -491,8 +502,8 @@ els.scanCamera.addEventListener("change", async () => {
     toast(err.message || "Could not read photo");
   }
 });
-els.search.addEventListener("input", renderPairs);
-els.search.addEventListener("keydown", (e) => {
+els.search?.addEventListener("input", renderPairs);
+els.search?.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     const symbol = normalizeSymbol(els.search.value);
     closeSheet();
@@ -503,8 +514,8 @@ els.search.addEventListener("keydown", (e) => {
   }
   if (e.key === "Escape") closeSheet();
 });
-els.shareBtn.addEventListener("click", shareImage);
-els.copyBtn.addEventListener("click", copyMessages);
+els.shareBtn?.addEventListener("click", shareImage);
+els.copyBtn?.addEventListener("click", copyMessages);
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     closePhoneCamera();
@@ -520,7 +531,7 @@ window.addEventListener("beforeinstallprompt", (e) => {
   }
 });
 
-els.installBtn.addEventListener("click", async () => {
+els.installBtn?.addEventListener("click", async () => {
   if (!state.deferredPrompt) return;
   state.deferredPrompt.prompt();
   await state.deferredPrompt.userChoice;
@@ -528,7 +539,7 @@ els.installBtn.addEventListener("click", async () => {
   els.install.hidden = true;
 });
 
-els.dismissInstall.addEventListener("click", () => {
+els.dismissInstall?.addEventListener("click", () => {
   localStorage.setItem("twoline.hideInstall", "1");
   els.install.hidden = true;
 });
