@@ -6,10 +6,13 @@ import {
   fetchTickers,
   curatedPairs,
   demoCandles,
-} from "./data.js?v=7";
-import { analyze, formatPrice } from "./analyze.js?v=7";
-import { buildMessages, copyText } from "./messages.js?v=7";
-import { Chart } from "./chart.js?v=7";
+  loadWatchlist,
+  saveWatchlist,
+  baseAsset,
+} from "./data.js?v=8";
+import { analyze, formatPrice } from "./analyze.js?v=8";
+import { buildMessages, copyText } from "./messages.js?v=8";
+import { Chart } from "./chart.js?v=8";
 import {
   captureOtherScreen,
   loadImageFile,
@@ -19,7 +22,7 @@ import {
   grabCameraFrame,
   stopStream,
   countCandlesQuick,
-} from "./scan.js?v=7";
+} from "./scan.js?v=8";
 
 const state = {
   symbol: localStorage.getItem("twoline.symbol") || "BTCUSDT",
@@ -33,6 +36,8 @@ const state = {
   deferredPrompt: null,
   mode: "live",
   scanCount: 0,
+  feed: "",
+  watch: loadWatchlist(),
 };
 
 const els = {
@@ -65,6 +70,7 @@ const els = {
   cameraShutter: document.getElementById("cameraShutter"),
   cameraBox: document.getElementById("cameraBox"),
   cameraHint: document.getElementById("cameraHint"),
+  watchRow: document.getElementById("watchRow"),
 };
 
 let cameraStream = null;
@@ -199,17 +205,24 @@ function renderPairs() {
     li.className = "pair-row" + (t.symbol === state.symbol ? " active" : "");
     const ch = t.change;
     const chTxt = ch == null ? "" : `${ch >= 0 ? "+" : ""}${ch.toFixed(2)}%`;
+    const pinned = isPinned(t.symbol);
     li.innerHTML = `
       <span class="pr-sym">${displaySymbol(t.symbol)}</span>
       <span class="pr-px">${t.last != null ? formatPrice(t.last) : t.custom ? "Open" : ""}</span>
       <span class="pr-ch ${ch == null ? "" : ch >= 0 ? "up" : "down"}">${chTxt}</span>`;
+    const pin = document.createElement("button");
+    pin.type = "button";
+    pin.className = "pr-pin" + (pinned ? " on" : "");
+    pin.textContent = pinned ? "Pinned" : "Pin";
+    pin.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (pinned) unpinPair(t.symbol);
+      else pinPair(t.symbol);
+    });
+    li.appendChild(pin);
     li.addEventListener("click", () => {
       closeSheet();
-      if (t.symbol === state.symbol) return;
-      state.symbol = t.symbol;
-      localStorage.setItem("twoline.symbol", state.symbol);
-      renderPairBtn();
-      load();
+      openPair(t.symbol);
     });
     els.list.appendChild(li);
   });
@@ -232,9 +245,10 @@ function closeSheet() {
 
 async function loadTickers() {
   try {
-    state.tickers = await fetchTickers(curatedPairs());
+    const symbols = [...new Set([...curatedPairs(), ...state.watch])];
+    state.tickers = await fetchTickers(symbols);
     renderPrice();
-    if (els.sheet.classList.contains("open")) renderPairs();
+    if (els.sheet?.classList.contains("open")) renderPairs();
   } catch {
     /* list still works without 24h % */
   }
@@ -244,18 +258,20 @@ async function load({ silent = false } = {}) {
   if (state.mode === "scan") return;
   if (!silent) {
     setLoading(true);
-    els.status.textContent = "Reading the tape…";
+    if (els.status) els.status.textContent = "Reading the tape…";
   }
   try {
-    const candles = await fetchKlines(state.symbol, state.tf, 160);
+    const out = await fetchKlines(state.symbol, state.tf, 160);
     state.demo = false;
-    apply(candles);
-  } catch (err) {
+    state.feed = out.feed || "";
+    apply(out.candles);
+  } catch {
     if (!state.candles.length) {
+      const demo = demoCandles();
       state.demo = true;
-      apply(demoCandles());
+      state.feed = "Demo";
+      apply(demo.candles);
     }
-    if (!silent) toast(err.message || "Live feed failed — showing demo");
   } finally {
     if (!silent) setLoading(false);
   }
@@ -274,7 +290,7 @@ function apply(candles) {
   chart?.setMeta({
     symbol: displaySymbol(state.symbol),
     tf: tfLabel(state.tf),
-    asOf: `${asOf}${state.demo ? " · demo" : ""}`,
+    asOf: `${asOf}${state.demo ? " · demo" : state.feed ? ` · ${state.feed}` : ""}`,
   });
   chart?.setData(candles, state.analysis, state.messages);
   renderPrice();
@@ -507,10 +523,8 @@ els.search?.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     const symbol = normalizeSymbol(els.search.value);
     closeSheet();
-    state.symbol = symbol;
-    localStorage.setItem("twoline.symbol", state.symbol);
-    renderPairBtn();
-    load();
+    pinPair(symbol);
+    openPair(symbol);
   }
   if (e.key === "Escape") closeSheet();
 });
@@ -545,14 +559,27 @@ els.dismissInstall?.addEventListener("click", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {});
+  navigator.serviceWorker.register("./sw.js?v=8", { scope: "./" }).catch(() => {});
 }
 
-renderTfs();
-renderPairBtn();
-chart.resize();
-load();
-loadTickers();
+try {
+  hideBoot();
+  setLoading(false);
+  renderTfs();
+  renderPairBtn();
+  renderWatch();
+  chart?.resize();
+  const demo = demoCandles();
+  state.demo = true;
+  state.feed = "Demo";
+  apply(demo.candles);
+  load({ silent: true });
+  loadTickers();
+} catch (err) {
+  console.error(err);
+  hideBoot();
+  setLoading(false);
+}
 setInterval(loadTickers, 60_000);
 setInterval(() => {
   if (document.visibilityState === "visible" && state.mode === "live") load({ silent: true });

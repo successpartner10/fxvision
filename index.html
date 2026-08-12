@@ -41,6 +41,8 @@
       </button>
     </header>
 
+    <div class="watch" id="watchRow" aria-label="Pinned pairs"></div>
+
     <div class="pricebar">
       <div id="price">—</div>
       <div id="change" class="change"></div>
@@ -70,6 +72,7 @@
     <div class="sheet-head">
       <h2>Pair</h2>
       <input id="pairSearch" type="search" placeholder="Search or type BTC, ETH, SOL…" autocomplete="off" />
+      <p class="sheet-note">Search any coin, tap it to open, or pin it for a 1-click button.</p>
     </div>
     <div id="pairList"></div>
   </div>
@@ -108,6 +111,6 @@
   </div>
 
   <div id="toast" role="status"></div>
-  <script type="module" src="js/app.js?v=7"></script>
+  <script type="module" src="js/app.js?v=8"></script>
 </body>
 </html>

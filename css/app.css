@@ -353,10 +353,62 @@ button, .chip, .pair-btn, .icon-btn {
   display: grid;
 }
 
+.watch {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.watch::-webkit-scrollbar { display: none; }
+.watch-chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 8px 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.watch-chip.active {
+  border-color: #3dd68c66;
+  background: rgba(61, 214, 140, 0.12);
+  color: var(--buy);
+}
+.watch-chip .x {
+  border: 0;
+  background: transparent;
+  color: var(--dim);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+}
+.watch-add {
+  flex-shrink: 0;
+  border: 1px dashed #2c3850;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
 .pair-row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 12px;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 10px;
+}
   align-items: center;
   width: 100%;
   text-align: left;
