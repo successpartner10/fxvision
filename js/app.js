@@ -564,6 +564,10 @@ els.pairBtn?.addEventListener("click", () => {
   }
   openSheet();
 });
+document.getElementById("inputBtn")?.addEventListener("click", () => {
+  if (state.mode === "scan") openScanSheet();
+  else openSheet();
+});
 els.backdrop?.addEventListener("click", closeAllSheets);
 els.scanBtn?.addEventListener("click", openScanSheet);
 els.scanScreenBtn?.addEventListener("click", scanOtherScreen);

@@ -21,27 +21,21 @@
         FX Vision
       </div>
       <button class="pair-btn" id="pairBtn" type="button" aria-haspopup="dialog">BTC/USDT</button>
-      <div class="top-actions">
       <button class="icon-btn" id="scanBtn" type="button" title="Scan a chart from another screen" aria-label="Scan a chart">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M4 7V5a1 1 0 0 1 1-1h2M20 7V5a1 1 0 0 0-1-1h-2M4 17v2a1 1 0 0 0 1 1h2M20 17v2a1 1 0 0 1-1 1h-2"/>
           <rect x="7" y="7" width="10" height="10" rx="1"/>
         </svg>
       </button>
-      <button class="icon-btn" id="copyBtn" type="button" title="Copy both lines" aria-label="Copy both lines">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="8" y="8" width="12" height="12" rx="2"/>
-          <path d="M4 16V6a2 2 0 0 1 2-2h10"/>
-        </svg>
-      </button>
-      <button class="icon-btn" id="shareBtn" type="button" title="Save results image" aria-label="Save results image">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/>
-        </svg>
-      </button>
     </header>
 
     <div class="tfs" id="tfs" role="tablist" aria-label="Timeframe"></div>
+
+    <div class="action-row">
+      <button type="button" class="action-btn" id="inputBtn">Input</button>
+      <button type="button" class="action-btn" id="copyBtn">Copy</button>
+      <button type="button" class="action-btn" id="shareBtn">Send</button>
+    </div>
 
     <div class="watch" id="watchRow" aria-label="Pinned pairs"></div>
 
