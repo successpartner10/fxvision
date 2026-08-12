@@ -14,17 +14,29 @@ function hueSat(r, g, b) {
   return { hue, sat, max, min };
 }
 
-function candleSign(r, g, b) {
+function candleSign(r, g, b, loose) {
   const { hue, sat, max } = hueSat(r, g, b);
-  if (max < 55 || sat < 0.28) return 0;
-  const green = (hue >= 85 && hue <= 175) || (g > r + 12 && g >= b - 8 && g > 70);
-  const red = hue <= 22 || hue >= 345 || (r > g + 18 && r > b + 8 && r > 80 && g < 160);
+  const minMax = loose ? 38 : 55;
+  const minSat = loose ? 0.1 : 0.28;
+  if (max < minMax || sat < minSat) {
+    if (loose) {
+      if (g > r + 6 && g > 42 && g + 4 >= b) return 1;
+      if (r > g + 6 && r > 42) return -1;
+    }
+    return 0;
+  }
+  const green = loose
+    ? (hue >= 68 && hue <= 188) || (g > r + 8 && g >= b - 18 && g > 48)
+    : (hue >= 85 && hue <= 175) || (g > r + 12 && g >= b - 8 && g > 70);
+  const red = loose
+    ? hue <= 40 || hue >= 328 || (r > g + 10 && r > b + 4 && r > 52)
+    : hue <= 22 || hue >= 345 || (r > g + 18 && r > b + 8 && r > 80 && g < 160);
   if (green && !red) return 1;
   if (red && !green) return -1;
   return 0;
 }
 
-function downsampleToCanvas(source, maxW = 1400) {
+function downsampleToCanvas(source, maxW = 1400, enhance = false) {
   const sw = source.naturalWidth || source.videoWidth || source.width;
   const sh = source.naturalHeight || source.videoHeight || source.height;
   const scale = sw > maxW ? maxW / sw : 1;
@@ -32,7 +44,11 @@ function downsampleToCanvas(source, maxW = 1400) {
   canvas.width = Math.max(1, Math.round(sw * scale));
   canvas.height = Math.max(1, Math.round(sh * scale));
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (enhance) {
+    ctx.filter = "contrast(1.3) saturate(1.75) brightness(1.06)";
+  }
   ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  ctx.filter = "none";
   return { canvas, ctx, scale };
 }
 
@@ -67,7 +83,7 @@ function densestRun(clusters) {
   const med = widths.slice().sort((a, b) => a - b)[Math.floor(widths.length / 2)] || 4;
   const typical = clusters.filter((c) => {
     const w = c.x1 - c.x0 + 1;
-    return w >= 2 && w <= med * 3.2;
+    return w >= 2 && w <= med * 3.5;
   });
   if (typical.length < 16) return clusters;
 
@@ -77,7 +93,7 @@ function densestRun(clusters) {
     for (let j = i + 16; j <= typical.length; j++) {
       const span = typical[j - 1].x1 - typical[i].x0;
       const count = j - i;
-      const avgGap = span / count;
+      const avgGap = span / Math.max(1, count);
       const score = count / (1 + avgGap / 18);
       if (score > bestScore) {
         bestScore = score;
@@ -88,8 +104,8 @@ function densestRun(clusters) {
   return typical.slice(best[0], best[1]);
 }
 
-export function extractCandlesFromImage(source) {
-  const { canvas, ctx } = downsampleToCanvas(source);
+function extractOnce(source, { loose, enhance, minColRatio, gap }) {
+  const { canvas, ctx } = downsampleToCanvas(source, loose ? 1600 : 1400, enhance);
   const { width: W, height: H } = canvas;
   const img = ctx.getImageData(0, 0, W, H);
   const data = img.data;
@@ -97,14 +113,22 @@ export function extractCandlesFromImage(source) {
   const signs = new Int8Array(W * H);
   const colCount = new Uint16Array(W);
   let painted = 0;
+  let minX = W;
+  let maxX = 0;
+  let minY = H;
+  let maxY = 0;
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const i = (y * W + x) * 4;
-      const s = candleSign(data[i], data[i + 1], data[i + 2]);
+      const s = candleSign(data[i], data[i + 1], data[i + 2], loose);
       signs[y * W + x] = s;
       if (s) {
         colCount[x] += 1;
         painted += 1;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
       }
     }
   }
@@ -112,12 +136,13 @@ export function extractCandlesFromImage(source) {
     return { candles: [], count: 0, reason: "No green/red candles found" };
   }
 
-  const minCol = Math.max(4, Math.floor(H * 0.012));
-  let clusters = mergeClusters(clustersFromHist(colCount, minCol), 2);
+  const chartH = Math.max(20, maxY - minY);
+  const minCol = Math.max(loose ? 3 : 4, Math.floor(chartH * minColRatio));
+  let clusters = mergeClusters(clustersFromHist(colCount, minCol), gap);
   clusters = densestRun(clusters);
   clusters = clusters.filter((c) => c.x1 - c.x0 >= 1);
   if (clusters.length < 12) {
-    return { candles: [], count: clusters.length, reason: "Need a closer chart — more candles in frame" };
+    return { candles: [], count: clusters.length, reason: "Need a closer chart — fill the frame" };
   }
 
   const candles = [];
@@ -132,7 +157,9 @@ export function extractCandlesFromImage(source) {
     let bodyHits = 0;
     let bull = 0;
     let bear = 0;
-    for (let y = 0; y < H; y++) {
+    const y0 = Math.max(0, minY - 4);
+    const y1 = Math.min(H - 1, maxY + 4);
+    for (let y = y0; y <= y1; y++) {
       let row = 0;
       for (let x = x0; x <= x1; x++) {
         const s = signs[y * W + x];
@@ -144,7 +171,7 @@ export function extractCandlesFromImage(source) {
       if (row === 0) continue;
       if (y < yTop) yTop = y;
       if (y > yBot) yBot = y;
-      if (row >= Math.max(2, cw * 0.38)) {
+      if (row >= Math.max(2, cw * (loose ? 0.3 : 0.38))) {
         if (y < bodyTop) bodyTop = y;
         if (y > bodyBot) bodyBot = y;
         bodyHits += 1;
@@ -175,6 +202,26 @@ export function extractCandlesFromImage(source) {
     return { candles: [], count: candles.length, reason: "Could not separate candles" };
   }
   return { candles, count: candles.length, reason: "" };
+}
+
+export function extractCandlesFromImage(source) {
+  const attempts = [
+    { loose: false, enhance: false, minColRatio: 0.012, gap: 2 },
+    { loose: true, enhance: true, minColRatio: 0.008, gap: 3 },
+    { loose: true, enhance: true, minColRatio: 0.005, gap: 4 },
+  ];
+  let best = { candles: [], count: 0, reason: "No green/red candles found" };
+  for (const opt of attempts) {
+    const result = extractOnce(source, opt);
+    if (result.count > best.count) best = result;
+    if (result.count >= 18) return result;
+  }
+  if (best.count >= 12) return best;
+  return {
+    candles: [],
+    count: best.count,
+    reason: "Hold closer, square to the screen, and kill the glare",
+  };
 }
 
 export async function captureOtherScreen() {
@@ -221,4 +268,39 @@ export function loadImageFile(file) {
     };
     img.src = url;
   });
+}
+
+export function cameraSupported() {
+  return Boolean(navigator.mediaDevices?.getUserMedia);
+}
+
+export async function startPhoneCamera(video) {
+  if (!cameraSupported()) {
+    throw new Error("This browser cannot open the camera");
+  }
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: {
+      facingMode: { ideal: "environment" },
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+    },
+  });
+  video.srcObject = stream;
+  video.setAttribute("playsinline", "true");
+  video.muted = true;
+  await video.play();
+  return stream;
+}
+
+export function grabCameraFrame(video) {
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth || 1280;
+  canvas.height = video.videoHeight || 720;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+  return canvas;
+}
+
+export function stopStream(stream) {
+  stream?.getTracks?.().forEach((t) => t.stop());
 }

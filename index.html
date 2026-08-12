@@ -84,8 +84,8 @@
         <span>Pick a monitor, window, or TradingView tab</span>
       </button>
       <button type="button" class="scan-action" id="scanPhotoBtn">
-        <strong>Photo of a screen</strong>
-        <span>Point the camera at the other display</span>
+        <strong>Phone camera</strong>
+        <span>Open the rear camera and point it at the other screen</span>
       </button>
       <button type="button" class="scan-action" id="scanUploadBtn">
         <strong>Upload screenshot</strong>
@@ -95,6 +95,16 @@
   </div>
   <input id="scanFile" type="file" accept="image/*" hidden />
   <input id="scanCamera" type="file" accept="image/*" capture="environment" hidden />
+
+  <div id="cameraScan" class="camera-scan" hidden>
+    <video id="cameraVideo" playsinline muted autoplay></video>
+    <div class="camera-mask" aria-hidden="true">
+      <div class="camera-box"></div>
+    </div>
+    <p class="camera-hint">Fill the box with the chart. Hold square. Kill the glare.</p>
+    <button type="button" class="camera-close" id="cameraClose" aria-label="Close camera">Close</button>
+    <button type="button" class="camera-shutter" id="cameraShutter" aria-label="Scan chart"></button>
+  </div>
 
   <div id="toast" role="status"></div>
   <script type="module" src="js/app.js"></script>

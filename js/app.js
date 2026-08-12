@@ -10,7 +10,15 @@ import {
 import { analyze, formatPrice } from "./analyze.js";
 import { buildMessages, copyText } from "./messages.js";
 import { Chart } from "./chart.js";
-import { captureOtherScreen, loadImageFile, extractCandlesFromImage } from "./scan.js";
+import {
+  captureOtherScreen,
+  loadImageFile,
+  extractCandlesFromImage,
+  cameraSupported,
+  startPhoneCamera,
+  grabCameraFrame,
+  stopStream,
+} from "./scan.js";
 
 const state = {
   symbol: localStorage.getItem("twoline.symbol") || "BTCUSDT",
@@ -50,7 +58,13 @@ const els = {
   scanUploadBtn: document.getElementById("scanUploadBtn"),
   scanFile: document.getElementById("scanFile"),
   scanCamera: document.getElementById("scanCamera"),
+  cameraScan: document.getElementById("cameraScan"),
+  cameraVideo: document.getElementById("cameraVideo"),
+  cameraClose: document.getElementById("cameraClose"),
+  cameraShutter: document.getElementById("cameraShutter"),
 };
+
+let cameraStream = null;
 
 const chart = new Chart(document.getElementById("chart"));
 
@@ -364,6 +378,41 @@ function exitScan() {
   load();
 }
 
+async function openPhoneCamera() {
+  closeScanSheet();
+  if (!cameraSupported()) {
+    els.scanCamera.click();
+    return;
+  }
+  try {
+    cameraStream = await startPhoneCamera(els.cameraVideo);
+    els.cameraScan.hidden = false;
+  } catch (err) {
+    if (err.name === "NotAllowedError") toast("Camera permission denied");
+    else {
+      toast("Opening the photo picker instead");
+      els.scanCamera.click();
+    }
+  }
+}
+
+function closePhoneCamera() {
+  stopStream(cameraStream);
+  cameraStream = null;
+  if (els.cameraVideo) els.cameraVideo.srcObject = null;
+  if (els.cameraScan) els.cameraScan.hidden = true;
+}
+
+async function shutterScan() {
+  if (!els.cameraVideo?.videoWidth) {
+    toast("Camera is still opening");
+    return;
+  }
+  const frame = grabCameraFrame(els.cameraVideo);
+  closePhoneCamera();
+  await processScan(frame);
+}
+
 async function scanOtherScreen() {
   closeScanSheet();
   try {
@@ -386,7 +435,9 @@ els.backdrop.addEventListener("click", closeAllSheets);
 els.scanBtn.addEventListener("click", openScanSheet);
 els.scanScreenBtn.addEventListener("click", scanOtherScreen);
 els.scanUploadBtn.addEventListener("click", () => els.scanFile.click());
-els.scanPhotoBtn.addEventListener("click", () => els.scanCamera.click());
+els.scanPhotoBtn.addEventListener("click", openPhoneCamera);
+els.cameraClose.addEventListener("click", closePhoneCamera);
+els.cameraShutter.addEventListener("click", shutterScan);
 els.scanFile.addEventListener("change", async () => {
   const file = els.scanFile.files?.[0];
   els.scanFile.value = "";
@@ -422,7 +473,10 @@ els.search.addEventListener("keydown", (e) => {
 els.shareBtn.addEventListener("click", shareImage);
 els.copyBtn.addEventListener("click", copyMessages);
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeAllSheets();
+  if (e.key === "Escape") {
+    closePhoneCamera();
+    closeAllSheets();
+  }
 });
 
 window.addEventListener("beforeinstallprompt", (e) => {

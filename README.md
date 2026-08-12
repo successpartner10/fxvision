@@ -31,6 +31,20 @@ No API key. No signup. Market data is proxied from public Binance endpoints (`da
 - Scan a chart from another screen (screen share, photo, or upload) and stamp the two lines on that image
 - Installable (manifest + service worker)
 
+## Scan another screen
+
+Tap the scan frame in the header:
+
+1. **Another screen** — pick a monitor, window, or TradingView tab (desktop)  
+2. **Phone camera** — rear camera viewfinder, point it at the other screen, tap the green shutter  
+3. **Upload screenshot** — PNG/JPG of the chart
+
+FX Vision reads the green/red candles off that image and stamps the two-line verdict on it.
+
+Phone tips: fill the green box with the chart, hold the phone square to the monitor, dim the room if the screen is reflecting. Dark-theme colored candles work. Hollow / black-and-white candles are still weak.
+
+A sample frame is in [`examples/sample-chart.png`](examples/sample-chart.png).
+
 ## Pair and timeframe
 
 Tap the pair to search (BTC, ETH, SOL, or any USDT symbol). Timeframes: 15m, 1H, 4H, 1D, 1W.
