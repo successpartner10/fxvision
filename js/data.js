@@ -48,11 +48,21 @@ function useLocalProxy() {
   return host === "localhost" || host === "127.0.0.1" || host.endsWith(".e2b.app");
 }
 
+async function fetchWithTimeout(url, ms = 7000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { signal: ctrl.signal, cache: "no-store" });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchJson(urls) {
   let lastErr = null;
   for (const url of urls) {
     try {
-      const res = await fetch(url);
+      const res = await fetchWithTimeout(url, 7000);
       if (!res.ok) {
         lastErr = new Error(`HTTP ${res.status}`);
         continue;

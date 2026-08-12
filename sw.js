@@ -1,4 +1,4 @@
-const CACHE = "fxvision-v4";
+const CACHE = "fxvision-v5";
 const ASSETS = [
   "./",
   "./index.html",
@@ -50,18 +50,18 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const fetched = fetch(event.request)
+  if (url.origin === self.location.origin) {
+    event.respondWith(
+      fetch(event.request)
         .then((res) => {
-          if (res && res.ok && url.origin === self.location.origin) {
+          if (res && res.ok) {
             const copy = res.clone();
             caches.open(CACHE).then((cache) => cache.put(event.request, copy));
           }
           return res;
         })
-        .catch(() => cached);
-      return cached || fetched;
-    })
-  );
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
 });

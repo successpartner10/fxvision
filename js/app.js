@@ -424,20 +424,20 @@ async function scanOtherScreen() {
   }
 }
 
-els.pairBtn.addEventListener("click", () => {
+els.pairBtn?.addEventListener("click", () => {
   if (state.mode === "scan") {
     openScanSheet();
     return;
   }
   openSheet();
 });
-els.backdrop.addEventListener("click", closeAllSheets);
-els.scanBtn.addEventListener("click", openScanSheet);
-els.scanScreenBtn.addEventListener("click", scanOtherScreen);
-els.scanUploadBtn.addEventListener("click", () => els.scanFile.click());
-els.scanPhotoBtn.addEventListener("click", openPhoneCamera);
-els.cameraClose.addEventListener("click", closePhoneCamera);
-els.cameraShutter.addEventListener("click", shutterScan);
+els.backdrop?.addEventListener("click", closeAllSheets);
+els.scanBtn?.addEventListener("click", openScanSheet);
+els.scanScreenBtn?.addEventListener("click", scanOtherScreen);
+els.scanUploadBtn?.addEventListener("click", () => els.scanFile?.click());
+els.scanPhotoBtn?.addEventListener("click", openPhoneCamera);
+els.cameraClose?.addEventListener("click", closePhoneCamera);
+els.cameraShutter?.addEventListener("click", shutterScan);
 els.scanFile.addEventListener("change", async () => {
   const file = els.scanFile.files?.[0];
   els.scanFile.value = "";
