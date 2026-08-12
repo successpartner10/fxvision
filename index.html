@@ -22,6 +22,12 @@
       </div>
       <button class="pair-btn" id="pairBtn" type="button" aria-haspopup="dialog">BTC/USDT</button>
       <div class="tfs" id="tfs" role="tablist" aria-label="Timeframe"></div>
+      <button class="icon-btn" id="scanBtn" type="button" title="Scan a chart from another screen" aria-label="Scan a chart">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 7V5a1 1 0 0 1 1-1h2M20 7V5a1 1 0 0 0-1-1h-2M4 17v2a1 1 0 0 0 1 1h2M20 17v2a1 1 0 0 1-1 1h-2"/>
+          <rect x="7" y="7" width="10" height="10" rx="1"/>
+        </svg>
+      </button>
       <button class="icon-btn" id="copyBtn" type="button" title="Copy both lines" aria-label="Copy both lines">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="8" y="8" width="12" height="12" rx="2"/>
@@ -66,6 +72,29 @@
     </div>
     <div id="pairList"></div>
   </div>
+
+  <div class="sheet" id="scanSheet" role="dialog" aria-hidden="true" aria-label="Scan a chart">
+    <div class="sheet-head">
+      <h2>Scan a chart</h2>
+      <p class="sheet-note">Read candles from another screen, then stamp BUY / SELL / WAIT on that image.</p>
+    </div>
+    <div class="scan-actions">
+      <button type="button" class="scan-action" id="scanScreenBtn">
+        <strong>Another screen</strong>
+        <span>Pick a monitor, window, or TradingView tab</span>
+      </button>
+      <button type="button" class="scan-action" id="scanPhotoBtn">
+        <strong>Photo of a screen</strong>
+        <span>Point the camera at the other display</span>
+      </button>
+      <button type="button" class="scan-action" id="scanUploadBtn">
+        <strong>Upload screenshot</strong>
+        <span>PNG or JPG of the chart, filled as large as you can</span>
+      </button>
+    </div>
+  </div>
+  <input id="scanFile" type="file" accept="image/*" hidden />
+  <input id="scanCamera" type="file" accept="image/*" capture="environment" hidden />
 
   <div id="toast" role="status"></div>
   <script type="module" src="js/app.js"></script>

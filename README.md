@@ -28,6 +28,7 @@ No API key. No signup. Market data is proxied from public Binance endpoints (`da
 - Writes both result lines onto the chart
 - Save / share the results image
 - Copy both lines as text for a post
+- Scan a chart from another screen (screen share, photo, or upload) and stamp the two lines on that image
 - Installable (manifest + service worker)
 
 ## Pair and timeframe

@@ -59,6 +59,7 @@ export class Chart {
     this.analysis = null;
     this.messages = null;
     this.meta = { symbol: "BTC/USDT", tf: "4H", asOf: "" };
+    this.scanImage = null;
     this.dpr = 1;
     this.cssW = 0;
     this.cssH = 0;
@@ -93,9 +94,20 @@ export class Chart {
     this.draw();
   }
 
+  setScanImage(image) {
+    this.scanImage = image || null;
+    this.draw();
+  }
+
+  clearScan() {
+    this.scanImage = null;
+    this.draw();
+  }
+
   draw() {
     if (!this.cssW || !this.cssH) return;
-    this.render(this.ctx, this.cssW, this.cssH, { header: false });
+    if (this.scanImage) this.renderScan(this.ctx, this.cssW, this.cssH, { header: false });
+    else this.render(this.ctx, this.cssW, this.cssH, { header: false });
   }
 
   overlayMetrics(ctx, width, messages) {
@@ -288,6 +300,46 @@ export class Chart {
     if (messages) this.drawOverlay(ctx, W, H, messages, overlay);
   }
 
+  renderScan(ctx, W, H, { header = false } = {}) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = C.bg;
+    ctx.fillRect(0, 0, W, H);
+
+    let top = 0;
+    if (header) {
+      top = 46;
+      ctx.fillStyle = "#0e121a";
+      ctx.fillRect(0, 0, W, top);
+      ctx.fillStyle = C.line;
+      ctx.fillRect(0, top - 1, W, 1);
+      ctx.fillStyle = C.text;
+      ctx.font = "700 14px Segoe UI, system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(this.meta.symbol || "Scanned chart", 16, top / 2);
+      ctx.fillStyle = C.muted;
+      ctx.font = "12px Segoe UI, system-ui, sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(this.meta.asOf || "FX Vision", W - 16, top / 2);
+    }
+
+    const messages = this.messages;
+    const overlay = this.overlayMetrics(ctx, W, messages);
+    const reserve = overlay.height ? overlay.height + 16 : 12;
+    const boxW = W;
+    const boxH = H - top - reserve;
+    const img = this.scanImage;
+    const iw = img.naturalWidth || img.width;
+    const ih = img.naturalHeight || img.height;
+    const fit = Math.min(boxW / iw, boxH / ih);
+    const dw = iw * fit;
+    const dh = ih * fit;
+    const dx = (boxW - dw) / 2;
+    const dy = top + (boxH - dh) / 2;
+    ctx.drawImage(img, dx, dy, dw, dh);
+    if (messages) this.drawOverlay(ctx, W, H, messages, overlay);
+  }
+
   pane(ctx, x, y, w, h) {
     ctx.fillStyle = C.pane;
     ctx.fillRect(x, y, w, h);
@@ -459,7 +511,8 @@ export class Chart {
     off.height = H * scale;
     const ctx = off.getContext("2d");
     ctx.scale(scale, scale);
-    this.render(ctx, W, H, { header: true });
+    if (this.scanImage) this.renderScan(ctx, W, H, { header: true });
+    else this.render(ctx, W, H, { header: true });
     return new Promise((resolve) => off.toBlob((b) => resolve(b), "image/png"));
   }
 }

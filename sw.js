@@ -1,4 +1,4 @@
-const CACHE = "fxvision-v2";
+const CACHE = "fxvision-v3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const ASSETS = [
   "./js/analyze.js",
   "./js/messages.js",
   "./js/chart.js",
+  "./js/scan.js",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",

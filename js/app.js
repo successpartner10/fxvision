@@ -10,6 +10,7 @@ import {
 import { analyze, formatPrice } from "./analyze.js";
 import { buildMessages, copyText } from "./messages.js";
 import { Chart } from "./chart.js";
+import { captureOtherScreen, loadImageFile, extractCandlesFromImage } from "./scan.js";
 
 const state = {
   symbol: localStorage.getItem("twoline.symbol") || "BTCUSDT",
@@ -21,6 +22,8 @@ const state = {
   loading: false,
   demo: false,
   deferredPrompt: null,
+  mode: "live",
+  scanCount: 0,
 };
 
 const els = {
@@ -40,6 +43,13 @@ const els = {
   dismissInstall: document.getElementById("dismissInstall"),
   toast: document.getElementById("toast"),
   loading: document.getElementById("loading"),
+  scanBtn: document.getElementById("scanBtn"),
+  scanSheet: document.getElementById("scanSheet"),
+  scanScreenBtn: document.getElementById("scanScreenBtn"),
+  scanPhotoBtn: document.getElementById("scanPhotoBtn"),
+  scanUploadBtn: document.getElementById("scanUploadBtn"),
+  scanFile: document.getElementById("scanFile"),
+  scanCamera: document.getElementById("scanCamera"),
 };
 
 const chart = new Chart(document.getElementById("chart"));
@@ -62,6 +72,16 @@ function setLoading(on) {
 
 function renderTfs() {
   els.tfs.innerHTML = "";
+  els.tfs.classList.toggle("is-scan", state.mode === "scan");
+  if (state.mode === "scan") {
+    const back = document.createElement("button");
+    back.type = "button";
+    back.className = "chip live-back active";
+    back.textContent = "Live tape";
+    back.addEventListener("click", exitScan);
+    els.tfs.appendChild(back);
+    return;
+  }
   TIMEFRAMES.forEach((tf) => {
     const b = document.createElement("button");
     b.type = "button";
@@ -79,6 +99,10 @@ function renderTfs() {
 }
 
 function renderPairBtn() {
+  if (state.mode === "scan") {
+    els.pairBtn.innerHTML = "<span>SCANNED</span>";
+    return;
+  }
   els.pairBtn.innerHTML = `<span>${displaySymbol(state.symbol)}</span><svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M5.5 7.5 10 12l4.5-4.5"/></svg>`;
 }
 
@@ -87,6 +111,12 @@ function tickerFor(symbol) {
 }
 
 function renderPrice() {
+  if (state.mode === "scan") {
+    els.price.textContent = state.messages?.verdict || "SCAN";
+    els.change.textContent = "from other screen";
+    els.change.className = "change";
+    return;
+  }
   const last = state.analysis?.last;
   const t = tickerFor(state.symbol);
   const px = last ? last.close : t?.last;
@@ -103,6 +133,12 @@ function renderPrice() {
 }
 
 function renderStatus() {
+  if (state.mode === "scan") {
+    els.status.textContent = state.scanCount
+      ? `Read ${state.scanCount} candles from the other screen`
+      : "Scan ready";
+    return;
+  }
   if (state.demo) {
     els.status.textContent = "Using demo tape — live feed unavailable";
     return;
@@ -176,6 +212,7 @@ async function loadTickers() {
 }
 
 async function load({ silent = false } = {}) {
+  if (state.mode === "scan") return;
   if (!silent) {
     setLoading(true);
     els.status.textContent = "Reading the tape…";
@@ -257,8 +294,119 @@ async function copyMessages() {
   }
 }
 
-els.pairBtn.addEventListener("click", openSheet);
-els.backdrop.addEventListener("click", closeSheet);
+function openScanSheet() {
+  closeSheet();
+  els.scanSheet.classList.add("open");
+  els.backdrop.classList.add("open");
+  els.scanSheet.setAttribute("aria-hidden", "false");
+}
+
+function closeScanSheet() {
+  els.scanSheet.classList.remove("open");
+  els.scanSheet.setAttribute("aria-hidden", "true");
+  if (!els.sheet.classList.contains("open")) els.backdrop.classList.remove("open");
+}
+
+function closeAllSheets() {
+  closeSheet();
+  closeScanSheet();
+}
+
+async function processScan(image) {
+  closeScanSheet();
+  setLoading(true);
+  els.status.textContent = "Reading candles off the screen…";
+  try {
+    const result = extractCandlesFromImage(image);
+    if (!result.candles.length) {
+      toast(result.reason || "Could not read that chart");
+      return;
+    }
+    state.mode = "scan";
+    state.demo = false;
+    state.scanCount = result.count;
+    state.candles = result.candles;
+    state.analysis = analyze(result.candles);
+    state.messages = buildMessages(state.analysis);
+    const asOf = new Date().toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    chart.setMeta({
+      symbol: "Scanned chart",
+      tf: "SCAN",
+      asOf: `${result.count} candles · ${asOf}`,
+    });
+    chart.setScanImage(image);
+    chart.setData(result.candles, state.analysis, state.messages);
+    els.scanBtn.classList.add("active");
+    renderPairBtn();
+    renderTfs();
+    renderPrice();
+    renderStatus();
+    toast(`Read ${result.count} candles`);
+  } catch (err) {
+    toast(err.message || "Scan failed");
+  } finally {
+    setLoading(false);
+  }
+}
+
+function exitScan() {
+  state.mode = "live";
+  state.scanCount = 0;
+  chart.clearScan();
+  els.scanBtn.classList.remove("active");
+  renderPairBtn();
+  renderTfs();
+  load();
+}
+
+async function scanOtherScreen() {
+  closeScanSheet();
+  try {
+    const frame = await captureOtherScreen();
+    await processScan(frame);
+  } catch (err) {
+    if (err.name === "NotAllowedError") toast("Screen capture was cancelled");
+    else toast(err.message || "Could not capture that screen");
+  }
+}
+
+els.pairBtn.addEventListener("click", () => {
+  if (state.mode === "scan") {
+    openScanSheet();
+    return;
+  }
+  openSheet();
+});
+els.backdrop.addEventListener("click", closeAllSheets);
+els.scanBtn.addEventListener("click", openScanSheet);
+els.scanScreenBtn.addEventListener("click", scanOtherScreen);
+els.scanUploadBtn.addEventListener("click", () => els.scanFile.click());
+els.scanPhotoBtn.addEventListener("click", () => els.scanCamera.click());
+els.scanFile.addEventListener("change", async () => {
+  const file = els.scanFile.files?.[0];
+  els.scanFile.value = "";
+  if (!file) return;
+  try {
+    await processScan(await loadImageFile(file));
+  } catch (err) {
+    toast(err.message || "Could not read image");
+  }
+});
+els.scanCamera.addEventListener("change", async () => {
+  const file = els.scanCamera.files?.[0];
+  els.scanCamera.value = "";
+  if (!file) return;
+  try {
+    await processScan(await loadImageFile(file));
+  } catch (err) {
+    toast(err.message || "Could not read photo");
+  }
+});
 els.search.addEventListener("input", renderPairs);
 els.search.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
@@ -274,7 +422,7 @@ els.search.addEventListener("keydown", (e) => {
 els.shareBtn.addEventListener("click", shareImage);
 els.copyBtn.addEventListener("click", copyMessages);
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeSheet();
+  if (e.key === "Escape") closeAllSheets();
 });
 
 window.addEventListener("beforeinstallprompt", (e) => {
@@ -309,10 +457,10 @@ load();
 loadTickers();
 setInterval(loadTickers, 60_000);
 setInterval(() => {
-  if (document.visibilityState === "visible") load({ silent: true });
+  if (document.visibilityState === "visible" && state.mode === "live") load({ silent: true });
 }, 90_000);
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") {
+  if (document.visibilityState === "visible" && state.mode === "live") {
     load({ silent: true });
     loadTickers();
   }
