@@ -2,7 +2,7 @@
   "name": "FX Vision",
   "short_name": "FX Vision",
   "description": "Two reads on one chart. Technical structure, then buy or sell in plain English.",
-  "start_url": "./",
+  "start_url": "./index.html",
   "scope": "./",
   "id": "./",
   "display": "standalone",

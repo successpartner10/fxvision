@@ -9,10 +9,10 @@ import {
   loadWatchlist,
   saveWatchlist,
   baseAsset,
-} from "./data.js?v=9";
-import { analyze, formatPrice } from "./analyze.js?v=9";
-import { buildMessages, copyText } from "./messages.js?v=9";
-import { Chart } from "./chart.js?v=9";
+} from "./data.js";
+import { analyze, formatPrice } from "./analyze.js";
+import { buildMessages, copyText } from "./messages.js";
+import { Chart } from "./chart.js";
 import {
   captureOtherScreen,
   loadImageFile,
@@ -22,7 +22,7 @@ import {
   grabCameraFrame,
   stopStream,
   countCandlesQuick,
-} from "./scan.js?v=9";
+} from "./scan.js";
 
 const state = {
   symbol: localStorage.getItem("twoline.symbol") || "BTCUSDT",
@@ -632,7 +632,7 @@ els.dismissInstall?.addEventListener("click", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=9", { scope: "./" }).catch(() => {});
+  navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {});
 }
 
 try {

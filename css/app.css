@@ -406,9 +406,18 @@ button, .chip, .pair-btn, .icon-btn {
 
 .pair-row {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
-  gap: 10px;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 4px 6px;
+  border-radius: 10px;
 }
+.pair-row:hover, .pair-row.active { background: #182132; }
+.pair-open {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
   align-items: center;
   width: 100%;
   text-align: left;
@@ -416,11 +425,9 @@ button, .chip, .pair-btn, .icon-btn {
   background: transparent;
   color: var(--text);
   font: inherit;
-  padding: 11px 10px;
-  border-radius: 10px;
+  padding: 8px 6px;
   cursor: pointer;
 }
-.pair-row:hover, .pair-row.active { background: #182132; }
 .pr-sym { font-weight: 700; font-size: 14px; }
 .pr-px { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
 .pr-ch { font-size: 12px; font-weight: 700; min-width: 58px; text-align: right; color: var(--dim); }
