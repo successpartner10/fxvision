@@ -1,4 +1,4 @@
-const CACHE = "fxvision-v8";
+const CACHE = "fxvision-v9";
 const ASSETS = [
   "./",
   "./index.html",

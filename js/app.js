@@ -9,10 +9,10 @@ import {
   loadWatchlist,
   saveWatchlist,
   baseAsset,
-} from "./data.js?v=8";
-import { analyze, formatPrice } from "./analyze.js?v=8";
-import { buildMessages, copyText } from "./messages.js?v=8";
-import { Chart } from "./chart.js?v=8";
+} from "./data.js?v=9";
+import { analyze, formatPrice } from "./analyze.js?v=9";
+import { buildMessages, copyText } from "./messages.js?v=9";
+import { Chart } from "./chart.js?v=9";
 import {
   captureOtherScreen,
   loadImageFile,
@@ -22,7 +22,7 @@ import {
   grabCameraFrame,
   stopStream,
   countCandlesQuick,
-} from "./scan.js?v=8";
+} from "./scan.js?v=9";
 
 const state = {
   symbol: localStorage.getItem("twoline.symbol") || "BTCUSDT",
@@ -186,7 +186,76 @@ function renderStatus() {
         minute: "2-digit",
       })
     : "";
-  els.status.textContent = asOf ? `Candle close ${asOf}` : "";
+  const feed = state.feed ? `${state.feed} · ` : "";
+  els.status.textContent = asOf ? `${feed}candle close ${asOf}` : feed;
+}
+
+function isPinned(symbol) {
+  return state.watch.includes(symbol);
+}
+
+function pinPair(symbol) {
+  const sym = normalizeSymbol(symbol);
+  if (state.watch.includes(sym)) {
+    toast(`${baseAsset(sym)} is already pinned`);
+    return;
+  }
+  state.watch = [...state.watch, sym].slice(0, 16);
+  saveWatchlist(state.watch);
+  renderWatch();
+  if (els.sheet?.classList.contains("open")) renderPairs();
+  toast(`${baseAsset(sym)} pinned`);
+}
+
+function unpinPair(symbol) {
+  if (state.watch.length <= 1) {
+    toast("Keep at least one pinned pair");
+    return;
+  }
+  state.watch = state.watch.filter((s) => s !== symbol);
+  saveWatchlist(state.watch);
+  renderWatch();
+  if (els.sheet?.classList.contains("open")) renderPairs();
+}
+
+function openPair(symbol) {
+  const sym = normalizeSymbol(symbol);
+  if (state.mode === "scan") exitScan();
+  state.symbol = sym;
+  localStorage.setItem("twoline.symbol", state.symbol);
+  renderPairBtn();
+  renderWatch();
+  load();
+}
+
+function renderWatch() {
+  if (!els.watchRow) return;
+  els.watchRow.innerHTML = "";
+  state.watch.forEach((sym) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "watch-chip" + (sym === state.symbol && state.mode === "live" ? " active" : "");
+    const name = document.createElement("span");
+    name.textContent = baseAsset(sym);
+    b.appendChild(name);
+    b.addEventListener("click", () => openPair(sym));
+    const x = document.createElement("span");
+    x.className = "x";
+    x.textContent = "×";
+    x.title = "Unpin";
+    x.addEventListener("click", (e) => {
+      e.stopPropagation();
+      unpinPair(sym);
+    });
+    b.appendChild(x);
+    els.watchRow.appendChild(b);
+  });
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "watch-add";
+  add.textContent = "+ Add pair";
+  add.addEventListener("click", openSheet);
+  els.watchRow.appendChild(add);
 }
 
 function renderPairs() {
@@ -200,30 +269,34 @@ function renderPairs() {
   }
   els.list.innerHTML = "";
   rows.slice(0, 40).forEach((t) => {
-    const li = document.createElement("button");
-    li.type = "button";
+    const li = document.createElement("div");
     li.className = "pair-row" + (t.symbol === state.symbol ? " active" : "");
     const ch = t.change;
     const chTxt = ch == null ? "" : `${ch >= 0 ? "+" : ""}${ch.toFixed(2)}%`;
     const pinned = isPinned(t.symbol);
-    li.innerHTML = `
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "pair-open";
+    open.innerHTML = `
       <span class="pr-sym">${displaySymbol(t.symbol)}</span>
       <span class="pr-px">${t.last != null ? formatPrice(t.last) : t.custom ? "Open" : ""}</span>
       <span class="pr-ch ${ch == null ? "" : ch >= 0 ? "up" : "down"}">${chTxt}</span>`;
+    open.addEventListener("click", () => {
+      closeSheet();
+      openPair(t.symbol);
+    });
     const pin = document.createElement("button");
     pin.type = "button";
     pin.className = "pr-pin" + (pinned ? " on" : "");
     pin.textContent = pinned ? "Pinned" : "Pin";
     pin.addEventListener("click", (e) => {
+      e.preventDefault();
       e.stopPropagation();
-      if (pinned) unpinPair(t.symbol);
+      if (isPinned(t.symbol)) unpinPair(t.symbol);
       else pinPair(t.symbol);
     });
+    li.appendChild(open);
     li.appendChild(pin);
-    li.addEventListener("click", () => {
-      closeSheet();
-      openPair(t.symbol);
-    });
     els.list.appendChild(li);
   });
 }
@@ -559,7 +632,7 @@ els.dismissInstall?.addEventListener("click", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=8", { scope: "./" }).catch(() => {});
+  navigator.serviceWorker.register("./sw.js?v=9", { scope: "./" }).catch(() => {});
 }
 
 try {
