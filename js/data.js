@@ -37,21 +37,61 @@ function toCandle(row) {
   };
 }
 
+const UPSTREAMS = [
+  "https://data-api.binance.vision",
+  "https://api.binance.com",
+  "https://api.binance.us",
+];
+
+function useLocalProxy() {
+  const host = location.hostname;
+  return host === "localhost" || host === "127.0.0.1" || host.endsWith(".e2b.app");
+}
+
+async function fetchJson(urls) {
+  let lastErr = null;
+  for (const url of urls) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        lastErr = new Error(`HTTP ${res.status}`);
+        continue;
+      }
+      const data = await res.json();
+      if (data && data.error) {
+        lastErr = new Error(data.error);
+        continue;
+      }
+      return data;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error("Could not load market data");
+}
+
 export async function fetchKlines(symbol, interval, limit = 160) {
   const params = new URLSearchParams({ symbol, interval, limit: String(limit) });
-  const res = await fetch(`/api/klines?${params}`);
-  if (!res.ok) throw new Error("Could not load candles");
-  const data = await res.json();
-  if (data.error) throw new Error(data.error);
+  const urls = [];
+  if (useLocalProxy()) urls.push(`/api/klines?${params}`);
+  for (const base of UPSTREAMS) {
+    urls.push(`${base}/api/v3/klines?${params}`);
+  }
+  const data = await fetchJson(urls);
   if (!Array.isArray(data) || data.length < 30) throw new Error("Not enough candles");
   return data.map(toCandle);
 }
 
 export async function fetchTickers(symbols = CURATED) {
-  const params = new URLSearchParams({ symbols: symbols.join(",") });
-  const res = await fetch(`/api/tickers?${params}`);
-  if (!res.ok) throw new Error("Could not load tickers");
-  const data = await res.json();
+  const packed = encodeURIComponent(JSON.stringify(symbols));
+  const urls = [];
+  if (useLocalProxy()) {
+    urls.push(`/api/tickers?symbols=${symbols.join(",")}`);
+  }
+  for (const base of UPSTREAMS) {
+    urls.push(`${base}/api/v3/ticker/24hr?symbols=${packed}`);
+  }
+  const data = await fetchJson(urls);
   if (!Array.isArray(data)) return [];
   return data.map((t) => ({
     symbol: t.symbol,

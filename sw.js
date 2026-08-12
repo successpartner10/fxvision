@@ -1,19 +1,19 @@
-const CACHE = "fxvision-v1";
+const CACHE = "fxvision-v2";
 const ASSETS = [
-  "/",
-  "/index.html",
-  "/css/app.css",
-  "/js/app.js",
-  "/js/data.js",
-  "/js/analyze.js",
-  "/js/messages.js",
-  "/js/chart.js",
-  "/manifest.json",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
-  "/icons/icon-maskable-512.png",
-  "/icons/apple-touch-icon.png",
-  "/icons/favicon.png",
+  "./",
+  "./index.html",
+  "./css/app.css",
+  "./js/app.js",
+  "./js/data.js",
+  "./js/analyze.js",
+  "./js/messages.js",
+  "./js/chart.js",
+  "./manifest.json",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/icon-maskable-512.png",
+  "./icons/apple-touch-icon.png",
+  "./icons/favicon.png",
 ];
 
 self.addEventListener("install", (event) => {
@@ -34,7 +34,10 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== "GET") return;
 
-  if (url.pathname.startsWith("/api/")) {
+  const isApi =
+    url.pathname.includes("/api/") ||
+    url.hostname.includes("binance");
+  if (isApi) {
     event.respondWith(
       fetch(event.request).catch(
         () => new Response(JSON.stringify({ error: "offline" }), {

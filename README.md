@@ -7,6 +7,7 @@ Free installable PWA. Live candles, then **two lines on the results image**:
 
 Pattern marks stay on the candles. The two messages sit in the glass bar at the bottom so a screenshot still makes sense.
 
+**Live:** [https://successpartner10.github.io/fxvision/](https://successpartner10.github.io/fxvision/)  
 **Repo:** [github.com/successpartner10/fxvision](https://github.com/successpartner10/fxvision)  
 **License:** MIT — free to use, copy, and ship.
 
