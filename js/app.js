@@ -18,6 +18,7 @@ import {
   startPhoneCamera,
   grabCameraFrame,
   stopStream,
+  countCandlesQuick,
 } from "./scan.js";
 
 const state = {
@@ -62,9 +63,12 @@ const els = {
   cameraVideo: document.getElementById("cameraVideo"),
   cameraClose: document.getElementById("cameraClose"),
   cameraShutter: document.getElementById("cameraShutter"),
+  cameraBox: document.getElementById("cameraBox"),
+  cameraHint: document.getElementById("cameraHint"),
 };
 
 let cameraStream = null;
+let previewTimer = null;
 
 const chart = new Chart(document.getElementById("chart"));
 
@@ -387,6 +391,7 @@ async function openPhoneCamera() {
   try {
     cameraStream = await startPhoneCamera(els.cameraVideo);
     els.cameraScan.hidden = false;
+    startCameraPreview();
   } catch (err) {
     if (err.name === "NotAllowedError") toast("Camera permission denied");
     else {
@@ -396,7 +401,35 @@ async function openPhoneCamera() {
   }
 }
 
+function startCameraPreview() {
+  stopCameraPreview();
+  previewTimer = setInterval(() => {
+    if (!els.cameraVideo?.videoWidth || !els.cameraHint) return;
+    try {
+      const frame = grabCameraFrame(els.cameraVideo, els.cameraBox);
+      const n = countCandlesQuick(frame);
+      if (n >= 8) {
+        els.cameraHint.textContent = `${n} candles in view — tap the green button`;
+        els.cameraHint.classList.add("ready");
+      } else {
+        els.cameraHint.textContent = n
+          ? `Seeing ${n} — move closer so the candles fill the box`
+          : "Point at the candles. Fill the green box.";
+        els.cameraHint.classList.remove("ready");
+      }
+    } catch {
+      /* preview is best-effort */
+    }
+  }, 400);
+}
+
+function stopCameraPreview() {
+  if (previewTimer) clearInterval(previewTimer);
+  previewTimer = null;
+}
+
 function closePhoneCamera() {
+  stopCameraPreview();
   stopStream(cameraStream);
   cameraStream = null;
   if (els.cameraVideo) els.cameraVideo.srcObject = null;
@@ -408,7 +441,7 @@ async function shutterScan() {
     toast("Camera is still opening");
     return;
   }
-  const frame = grabCameraFrame(els.cameraVideo);
+  const frame = grabCameraFrame(els.cameraVideo, els.cameraBox);
   closePhoneCamera();
   await processScan(frame);
 }

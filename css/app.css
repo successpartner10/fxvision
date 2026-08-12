@@ -426,6 +426,9 @@ button, .chip, .pair-btn, .icon-btn {
   font-weight: 600;
   text-shadow: 0 1px 8px #000;
 }
+.camera-hint.ready {
+  color: #3dd68c;
+}
 .camera-close {
   position: absolute;
   top: calc(14px + var(--safe-top));

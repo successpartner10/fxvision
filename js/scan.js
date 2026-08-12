@@ -14,29 +14,7 @@ function hueSat(r, g, b) {
   return { hue, sat, max, min };
 }
 
-function candleSign(r, g, b, loose) {
-  const { hue, sat, max } = hueSat(r, g, b);
-  const minMax = loose ? 38 : 55;
-  const minSat = loose ? 0.1 : 0.28;
-  if (max < minMax || sat < minSat) {
-    if (loose) {
-      if (g > r + 6 && g > 42 && g + 4 >= b) return 1;
-      if (r > g + 6 && r > 42) return -1;
-    }
-    return 0;
-  }
-  const green = loose
-    ? (hue >= 68 && hue <= 188) || (g > r + 8 && g >= b - 18 && g > 48)
-    : (hue >= 85 && hue <= 175) || (g > r + 12 && g >= b - 8 && g > 70);
-  const red = loose
-    ? hue <= 40 || hue >= 328 || (r > g + 10 && r > b + 4 && r > 52)
-    : hue <= 22 || hue >= 345 || (r > g + 18 && r > b + 8 && r > 80 && g < 160);
-  if (green && !red) return 1;
-  if (red && !green) return -1;
-  return 0;
-}
-
-function downsampleToCanvas(source, maxW = 1400, enhance = false) {
+function downsampleToCanvas(source, maxW = 1200, enhance = false) {
   const sw = source.naturalWidth || source.videoWidth || source.width;
   const sh = source.naturalHeight || source.videoHeight || source.height;
   const scale = sw > maxW ? maxW / sw : 1;
@@ -44,12 +22,97 @@ function downsampleToCanvas(source, maxW = 1400, enhance = false) {
   canvas.width = Math.max(1, Math.round(sw * scale));
   canvas.height = Math.max(1, Math.round(sh * scale));
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (enhance) {
-    ctx.filter = "contrast(1.3) saturate(1.75) brightness(1.06)";
-  }
+  if (enhance) ctx.filter = "contrast(1.35) saturate(1.8) brightness(1.05)";
   ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
   ctx.filter = "none";
-  return { canvas, ctx, scale };
+  return { canvas, ctx };
+}
+
+function median(arr) {
+  if (!arr.length) return 0;
+  const s = arr.slice().sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)];
+}
+
+function estimateBackground(data, W, H) {
+  const samples = [];
+  const yStep = Math.max(1, Math.floor(H / 28));
+  const xStep = Math.max(1, Math.floor(W / 36));
+  for (let y = 0; y < H; y += yStep) {
+    for (let x = 0; x < W; x += xStep) {
+      const i = (y * W + x) * 4;
+      samples.push([data[i], data[i + 1], data[i + 2]]);
+    }
+  }
+  samples.sort((a, b) => a[0] + a[1] + a[2] - (b[0] + b[1] + b[2]));
+  const m = samples[Math.floor(samples.length / 2)] || [20, 24, 32];
+  return {
+    r: m[0],
+    g: m[1],
+    b: m[2],
+    lum: 0.3 * m[0] + 0.59 * m[1] + 0.11 * m[2],
+  };
+}
+
+function isInk(r, g, b, bg) {
+  const lum = 0.3 * r + 0.59 * g + 0.11 * b;
+  const dist = Math.hypot(r - bg.r, g - bg.g, b - bg.b);
+  const { sat } = hueSat(r, g, b);
+  if (bg.lum < 100) {
+    return lum > bg.lum + 16 || sat > 0.18 || dist > 32;
+  }
+  return lum < bg.lum - 16 || sat > 0.18 || dist > 32;
+}
+
+function candleDir(r, g, b) {
+  if (g > r + 4 && g + 6 >= b) return 1;
+  if (r > g + 4) return -1;
+  const { hue, sat } = hueSat(r, g, b);
+  if (sat < 0.08) return 0;
+  if (hue >= 70 && hue <= 190) return 1;
+  if (hue <= 40 || hue >= 320) return -1;
+  return 0;
+}
+
+function estimatePeriod(hist) {
+  const mean = hist.reduce((a, b) => a + b, 0) / Math.max(1, hist.length);
+  let bestLag = 8;
+  let best = -Infinity;
+  const maxLag = Math.min(48, Math.floor(hist.length / 8));
+  for (let lag = 4; lag <= maxLag; lag++) {
+    let s = 0;
+    for (let i = 0; i < hist.length - lag; i++) {
+      s += (hist[i] - mean) * (hist[i + lag] - mean);
+    }
+    if (s > best) {
+      best = s;
+      bestLag = lag;
+    }
+  }
+  return bestLag;
+}
+
+function peaksFromHist(hist, period) {
+  const peaks = [];
+  const half = Math.max(2, Math.floor(period * 0.42));
+  const floor = median(Array.from(hist)) * 0.35;
+  for (let x = half; x < hist.length - half; x++) {
+    if (hist[x] <= floor) continue;
+    let isMax = true;
+    for (let k = x - half; k <= x + half; k++) {
+      if (hist[k] > hist[x]) {
+        isMax = false;
+        break;
+      }
+    }
+    if (!isMax) continue;
+    if (peaks.length && x - peaks[peaks.length - 1] < period * 0.55) {
+      if (hist[x] > hist[peaks[peaks.length - 1]]) peaks[peaks.length - 1] = x;
+    } else {
+      peaks.push(x);
+    }
+  }
+  return peaks;
 }
 
 function clustersFromHist(hist, minCount) {
@@ -77,76 +140,51 @@ function mergeClusters(clusters, gap) {
   return merged;
 }
 
-function densestRun(clusters) {
-  if (clusters.length <= 24) return clusters;
-  const widths = clusters.map((c) => c.x1 - c.x0 + 1);
-  const med = widths.slice().sort((a, b) => a - b)[Math.floor(widths.length / 2)] || 4;
-  const typical = clusters.filter((c) => {
-    const w = c.x1 - c.x0 + 1;
-    return w >= 2 && w <= med * 3.5;
-  });
-  if (typical.length < 16) return clusters;
-
-  let best = [0, typical.length];
-  let bestScore = 0;
-  for (let i = 0; i < typical.length; i++) {
-    for (let j = i + 16; j <= typical.length; j++) {
-      const span = typical[j - 1].x1 - typical[i].x0;
-      const count = j - i;
-      const avgGap = span / Math.max(1, count);
-      const score = count / (1 + avgGap / 18);
-      if (score > bestScore) {
-        bestScore = score;
-        best = [i, j];
-      }
-    }
-  }
-  return typical.slice(best[0], best[1]);
-}
-
-function extractOnce(source, { loose, enhance, minColRatio, gap }) {
-  const { canvas, ctx } = downsampleToCanvas(source, loose ? 1600 : 1400, enhance);
+function extractOnce(source, { enhance = true, maxW = 1200 } = {}) {
+  const { canvas, ctx } = downsampleToCanvas(source, maxW, enhance);
   const { width: W, height: H } = canvas;
   const img = ctx.getImageData(0, 0, W, H);
   const data = img.data;
+  const bg = estimateBackground(data, W, H);
 
-  const signs = new Int8Array(W * H);
-  const colCount = new Uint16Array(W);
+  const y0 = Math.floor(H * 0.08);
+  const y1 = Math.floor(H * 0.78);
+  const ink = new Uint8Array(W * H);
+  const colCount = new Float32Array(W);
   let painted = 0;
-  let minX = W;
-  let maxX = 0;
-  let minY = H;
-  let maxY = 0;
-  for (let y = 0; y < H; y++) {
+
+  for (let y = y0; y <= y1; y++) {
     for (let x = 0; x < W; x++) {
       const i = (y * W + x) * 4;
-      const s = candleSign(data[i], data[i + 1], data[i + 2], loose);
-      signs[y * W + x] = s;
-      if (s) {
-        colCount[x] += 1;
-        painted += 1;
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
+      if (!isInk(data[i], data[i + 1], data[i + 2], bg)) continue;
+      ink[y * W + x] = 1;
+      colCount[x] += 1;
+      painted += 1;
     }
   }
-  if (painted < 80) {
-    return { candles: [], count: 0, reason: "No green/red candles found" };
+  if (painted < 40) {
+    return { candles: [], count: 0, reason: "No candles in the box yet" };
   }
 
-  const chartH = Math.max(20, maxY - minY);
-  const minCol = Math.max(loose ? 3 : 4, Math.floor(chartH * minColRatio));
-  let clusters = mergeClusters(clustersFromHist(colCount, minCol), gap);
-  clusters = densestRun(clusters);
-  clusters = clusters.filter((c) => c.x1 - c.x0 >= 1);
-  if (clusters.length < 12) {
-    return { candles: [], count: clusters.length, reason: "Need a closer chart — fill the frame" };
+  const base = median(Array.from(colCount));
+  for (let x = 0; x < W; x++) {
+    colCount[x] = Math.max(0, colCount[x] - base * 0.4);
+  }
+
+  const period = estimatePeriod(colCount);
+  const peaks = peaksFromHist(colCount, period);
+  let bands = peaks.map((x) => {
+    const half = Math.max(1, Math.floor(period * 0.32));
+    return { x0: Math.max(0, x - half), x1: Math.min(W - 1, x + half) };
+  });
+
+  if (bands.length < 8) {
+    const minCol = Math.max(2, Math.floor((y1 - y0) * 0.03));
+    bands = mergeClusters(clustersFromHist(colCount, minCol), Math.max(1, Math.floor(period * 0.25)));
   }
 
   const candles = [];
-  clusters.forEach((c, idx) => {
+  bands.forEach((c, idx) => {
     const x0 = c.x0;
     const x1 = c.x1;
     const cw = x1 - x0 + 1;
@@ -157,33 +195,39 @@ function extractOnce(source, { loose, enhance, minColRatio, gap }) {
     let bodyHits = 0;
     let bull = 0;
     let bear = 0;
-    const y0 = Math.max(0, minY - 4);
-    const y1 = Math.min(H - 1, maxY + 4);
+    let rs = 0;
+    let gs = 0;
+    let n = 0;
     for (let y = y0; y <= y1; y++) {
       let row = 0;
       for (let x = x0; x <= x1; x++) {
-        const s = signs[y * W + x];
-        if (!s) continue;
+        if (!ink[y * W + x]) continue;
         row += 1;
-        if (s > 0) bull += 1;
-        else bear += 1;
+        const i = (y * W + x) * 4;
+        rs += data[i];
+        gs += data[i + 1];
+        n += 1;
+        const dir = candleDir(data[i], data[i + 1], data[i + 2]);
+        if (dir > 0) bull += 1;
+        if (dir < 0) bear += 1;
       }
-      if (row === 0) continue;
+      if (!row) continue;
       if (y < yTop) yTop = y;
       if (y > yBot) yBot = y;
-      if (row >= Math.max(2, cw * (loose ? 0.3 : 0.38))) {
+      if (row >= Math.max(1, cw * 0.28)) {
         if (y < bodyTop) bodyTop = y;
         if (y > bodyBot) bodyBot = y;
         bodyHits += 1;
       }
     }
-    if (yBot <= yTop) return;
+    if (yBot - yTop < 3) return;
     if (bodyHits < 2 || bodyBot <= bodyTop) {
       const mid = (yTop + yBot) / 2;
-      bodyTop = Math.floor(mid - (yBot - yTop) * 0.18);
-      bodyBot = Math.ceil(mid + (yBot - yTop) * 0.18);
+      bodyTop = Math.floor(mid - (yBot - yTop) * 0.2);
+      bodyBot = Math.ceil(mid + (yBot - yTop) * 0.2);
     }
-    const up = bull >= bear;
+    let up = bull >= bear;
+    if (bull + bear < 6 && n) up = gs / n >= rs / n;
     const high = H - yTop;
     const low = H - yBot;
     const open = up ? H - bodyBot : H - bodyTop;
@@ -198,30 +242,37 @@ function extractOnce(source, { loose, enhance, minColRatio, gap }) {
     });
   });
 
-  if (candles.length < 12) {
-    return { candles: [], count: candles.length, reason: "Could not separate candles" };
-  }
-  return { candles, count: candles.length, reason: "" };
+  return {
+    candles,
+    count: candles.length,
+    reason: candles.length ? "" : "Could not separate candles",
+  };
 }
 
 export function extractCandlesFromImage(source) {
   const attempts = [
-    { loose: false, enhance: false, minColRatio: 0.012, gap: 2 },
-    { loose: true, enhance: true, minColRatio: 0.008, gap: 3 },
-    { loose: true, enhance: true, minColRatio: 0.005, gap: 4 },
+    { enhance: true, maxW: 1100 },
+    { enhance: false, maxW: 900 },
+    { enhance: true, maxW: 700 },
   ];
-  let best = { candles: [], count: 0, reason: "No green/red candles found" };
+  let best = { candles: [], count: 0, reason: "No candles in the box yet" };
   for (const opt of attempts) {
     const result = extractOnce(source, opt);
     if (result.count > best.count) best = result;
-    if (result.count >= 18) return result;
+    if (result.count >= 16) return result;
   }
-  if (best.count >= 12) return best;
+  if (best.count >= 8) return best;
   return {
     candles: [],
     count: best.count,
-    reason: "Hold closer, square to the screen, and kill the glare",
+    reason: best.count
+      ? `Only ${best.count} candles — fill the green box with just the chart`
+      : "No candles in the box yet — fill it with the chart and kill the glare",
   };
+}
+
+export function countCandlesQuick(source) {
+  return extractOnce(source, { enhance: true, maxW: 480 }).count;
 }
 
 export async function captureOtherScreen() {
@@ -293,11 +344,34 @@ export async function startPhoneCamera(video) {
   return stream;
 }
 
-export function grabCameraFrame(video) {
+export function grabCameraFrame(video, guideEl) {
+  const vw = video.videoWidth || 1280;
+  const vh = video.videoHeight || 720;
+  const vRect = video.getBoundingClientRect();
+  let sx = 0;
+  let sy = 0;
+  let sw = vw;
+  let sh = vh;
+
+  if (guideEl && vRect.width && vRect.height) {
+    const scale = Math.max(vRect.width / vw, vRect.height / vh);
+    const ox = (vw * scale - vRect.width) / 2;
+    const oy = (vh * scale - vRect.height) / 2;
+    const g = guideEl.getBoundingClientRect();
+    sx = (g.left - vRect.left + ox) / scale;
+    sy = (g.top - vRect.top + oy) / scale;
+    sw = g.width / scale;
+    sh = g.height / scale;
+    sx = Math.max(0, Math.min(vw - 2, sx));
+    sy = Math.max(0, Math.min(vh - 2, sy));
+    sw = Math.max(8, Math.min(vw - sx, sw));
+    sh = Math.max(8, Math.min(vh - sy, sh));
+  }
+
   const canvas = document.createElement("canvas");
-  canvas.width = video.videoWidth || 1280;
-  canvas.height = video.videoHeight || 720;
-  canvas.getContext("2d").drawImage(video, 0, 0);
+  canvas.width = Math.round(sw);
+  canvas.height = Math.round(sh);
+  canvas.getContext("2d").drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
   return canvas;
 }
 
