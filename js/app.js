@@ -334,7 +334,7 @@ async function load({ silent = false } = {}) {
     if (els.status) els.status.textContent = "Reading the tape…";
   }
   try {
-    const out = await fetchKlines(state.symbol, state.tf, 160);
+    const out = await fetchKlines(state.symbol, state.tf, TIMEFRAMES.find((t) => t.id === state.tf)?.limit || 200);
     state.demo = false;
     state.feed = out.feed || "";
     apply(out.candles);

@@ -96,29 +96,37 @@ body {
 
 .pair-btn:hover { border-color: #2c3850; }
 
-.tfs {
+.top-actions {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   margin-left: auto;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
-.tfs::-webkit-scrollbar { display: none; }
 
+.tfs {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  padding: 10px 12px 0;
+}
+.tfs.is-scan {
+  grid-template-columns: 1fr;
+}
 .chip {
-  border: 0;
-  background: transparent;
-  color: var(--muted);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
   font: inherit;
-  font-size: 12px;
-  font-weight: 650;
-  padding: 6px 8px;
-  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 750;
+  min-height: 48px;
+  padding: 10px 6px;
+  border-radius: 12px;
   cursor: pointer;
 }
 .chip.active {
-  background: #1a2332;
-  color: var(--text);
+  background: rgba(61, 214, 140, 0.16);
+  border-color: #3dd68c77;
+  color: var(--buy);
 }
 
 .icon-btn {

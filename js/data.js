@@ -6,11 +6,11 @@ const CURATED = [
 ];
 
 export const TIMEFRAMES = [
-  { id: "15m", label: "15m", interval: "15m" },
-  { id: "1h", label: "1H", interval: "1h" },
-  { id: "4h", label: "4H", interval: "4h" },
-  { id: "1d", label: "1D", interval: "1d" },
-  { id: "1w", label: "1W", interval: "1w" },
+  { id: "15m", label: "15 min", interval: "15m", limit: 400 },
+  { id: "1h", label: "1 hour", interval: "1h", limit: 300 },
+  { id: "4h", label: "4 hour", interval: "4h", limit: 220 },
+  { id: "1d", label: "1 day", interval: "1d", limit: 220 },
+  { id: "1w", label: "1 week", interval: "1w", limit: 160 },
 ];
 
 const KRAKEN = {
